@@ -429,6 +429,45 @@ from volcengine_client import create_client
 client = create_client(app_id, access_key, concurrency=10)
 ```
 
+## Docker Deployment
+
+### Docker Hub Repository
+🐳 **Official Docker Image**: [`betashow/volcengine-concurrent-tts`](https://hub.docker.com/repository/docker/betashow/volcengine-concurrent-tts/general)
+
+### Quick Docker Usage
+```bash
+# Pull the latest image
+docker pull betashow/volcengine-concurrent-tts:latest
+
+# Run with environment variables
+docker run -d \
+  --name volcengine-tts \
+  -p 8000:8000 \
+  -e VOLCENGINE_TTS_APPID=your_app_id \
+  -e VOLCENGINE_TTS_ACCESS_KEY=your_access_key \
+  -e VOLCENGINE_TTS_CONCURRENCY=10 \
+  betashow/volcengine-concurrent-tts:latest
+
+# Run without environment variables (credentials via API payload)
+docker run -d \
+  --name volcengine-tts \
+  -p 8000:8000 \
+  betashow/volcengine-concurrent-tts:latest
+```
+
+### Production Deployment
+The service can be deployed behind a reverse proxy (nginx) with custom endpoints:
+- **Health Check**: `GET /` - Returns service status
+- **API Endpoint**: `POST /generate-batch` - Main TTS generation endpoint
+- **Recommended Setup**: Deploy behind nginx with rate limiting and SSL termination
+
+### Docker Features
+- ✅ **No pre-loaded credentials** - Secure deployment
+- ✅ **User-provided credentials** via API payload
+- ✅ **Health checks** built-in for container orchestration
+- ✅ **Production ready** with proper error handling
+- ✅ **Global concurrency control** for API rate limiting
+
 ## Testing Both Modes
 
 Create your own test scripts to verify both usage modes. Your test scripts should demonstrate:
@@ -436,6 +475,7 @@ Create your own test scripts to verify both usage modes. Your test scripts shoul
 - FastAPI server usage with HTTP requests  
 - Performance comparison between modes
 - Integration with your specific use case
+- Docker container testing with production endpoints
 
 ## Error Handling
 

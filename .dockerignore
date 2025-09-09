@@ -1,0 +1,25 @@
+# Ignore sensitive files
+.env
+.git
+.gitignore
+
+# Ignore Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignore development files
+.pytest_cache
+.coverage
+.vscode
+.idea
+
+# Ignore documentation
+README.md
+PRIVATE/
+
+# Ignore local development files
+*.log
+.DS_Store
