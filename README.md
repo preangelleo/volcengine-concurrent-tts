@@ -97,66 +97,130 @@ For detailed testing instructions, see `PRIVATE/TEST_GUIDE.md`
 
 ## Usage Modes
 
-This application supports **two usage modes** to fit different integration needs:
+This application supports **two usage modes** with **different concurrency control behaviors**:
 
-### 🔥 Mode 1: Direct Client Usage (Recommended for Python Projects)
+## 🚦 **Critical Concurrency Control Differences**
 
-Use the `VolcengineConcurrentTTS` client class directly in your Python applications:
+### 🌐 **Mode 1: FastAPI Server (GLOBAL Concurrency Control)**
+**✅ Recommended for Multiple Applications/Users**
+
+```bash
+# Start the server - ALL requests share ONE global semaphore
+python main.py
+```
+
+**🔒 Concurrency Behavior:**
+- **Global Limit**: ALL requests across ALL applications share the same concurrency pool
+- **Account Safe**: Total concurrent API calls NEVER exceed your Volcengine account limit
+- **Example**: 10 applications × 20 requests each = 200 total requests, but only 10 run concurrently
+- **Result**: ✅ No API limit violations, no 429 errors from Volcengine
+
+```python
+# Multiple applications can safely call the server simultaneously
+# App 1: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})
+# App 2: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})  
+# App 3: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})
+# → Server ensures max 10 concurrent Volcengine API calls total
+```
+
+**Advantages:**
+- ✅ **Account Protection**: Never exceeds API limits regardless of load
+- ✅ Language-agnostic HTTP API
+- ✅ Multiple applications can share safely
+- ✅ Acts as a "gatekeeper" for your API quota
+- ✅ Centralized concurrency management
+
+**⚠️ Use This Mode When:**
+- You have multiple applications using TTS
+- You want to prevent API limit violations
+- You need centralized quota management
+- You have team members using the same API account
+
+---
+
+### 📦 **Mode 2: Direct Client (INDEPENDENT Concurrency Control)**
+**✅ Recommended for Single Application Usage**
 
 ```python
 from volcengine_client import VolcengineConcurrentTTS, TaskItem
 
-# Initialize client
+# Each client instance manages its OWN concurrency independently
+client1 = VolcengineConcurrentTTS(..., concurrency=10)  # Client 1: up to 10 concurrent
+client2 = VolcengineConcurrentTTS(..., concurrency=10)  # Client 2: up to 10 concurrent  
+client3 = VolcengineConcurrentTTS(..., concurrency=10)  # Client 3: up to 10 concurrent
+
+# Async usage
+results = await client1.generate_batch_async(tasks)
+
+# Sync usage  
+results = client2.generate_batch_sync(tasks)
+```
+
+**🔒 Concurrency Behavior:**
+- **Independent Limits**: Each client instance has its own concurrency pool
+- **Risk of Overload**: Multiple clients can exceed total account limits
+- **Example**: 3 clients × 10 concurrent each = up to 30 concurrent API calls
+- **Result**: ⚠️ Potential 429 errors if total exceeds your Volcengine account limit
+
+**Advantages:**
+- ✅ No server setup required
+- ✅ Lower latency (no HTTP overhead)
+- ✅ Direct Python integration  
+- ✅ Both sync and async support
+- ✅ Simpler for single-application use
+
+**⚠️ Use This Mode When:**
+- You have only ONE application using TTS
+- You control all TTS usage in your system
+- You want maximum performance for a single use case
+- You can ensure total concurrency stays within limits
+
+---
+
+## 🎯 **Which Mode Should You Choose?**
+
+| Scenario | Recommended Mode | Reason |
+|----------|------------------|---------|
+| **Multiple apps/users** | 🌐 **FastAPI Server** | Global concurrency control prevents API limit violations |
+| **Team development** | 🌐 **FastAPI Server** | Centralized quota management, no conflicts |
+| **Production deployment** | 🌐 **FastAPI Server** | Account protection, better resource management |
+| **Single Python app** | 📦 **Direct Client** | Simpler integration, lower latency |
+| **Prototyping/testing** | 📦 **Direct Client** | Faster setup, direct control |
+
+## ⚡ **Quick Start Examples**
+
+### 🌐 FastAPI Server Mode
+```bash
+# Terminal 1: Start server
+python main.py
+
+# Terminal 2: Use from any language
+curl -X POST http://localhost:8000/generate-batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tasks": [{"task_id": "test", "text": "Hello world", "voice_type": "BV001_streaming"}],
+    "credentials": {
+      "volcengine_tts_appid": "your_app_id",
+      "volcengine_tts_access_key": "your_access_key",
+      "volcengine_tts_secret_key": "your_secret_key"
+    }
+  }'
+```
+
+### 📦 Direct Client Mode
+```python
+from volcengine_client import VolcengineConcurrentTTS, TaskItem
+
 client = VolcengineConcurrentTTS(
     app_id="your_app_id",
     access_key="your_access_key", 
     secret_key="your_secret_key",
-    concurrency=10
+    concurrency=10  # This client's individual limit
 )
 
-# Create tasks
-tasks = [
-    TaskItem("task1", "Hello world", "BV001_streaming"),
-    TaskItem("task2", "How are you?", "BV002_streaming")
-]
-
-# Async usage (recommended)
+tasks = [TaskItem("task1", "Hello world", "BV001_streaming")]
 results = await client.generate_batch_async(tasks)
-
-# Sync usage (also available)
-results = client.generate_batch_sync(tasks)
-
-# Single text generation
-result = await client.generate_single_async("Hello!", "BV001_streaming")
-
-# Save audio to file
-client.save_audio_file(result, "output.mp3")
 ```
-
-**Advantages of Direct Client Usage:**
-- ✅ No server setup required
-- ✅ Lower latency (no HTTP overhead)  
-- ✅ Direct Python integration
-- ✅ Both sync and async support
-- ✅ Easier error handling
-
-### 🌐 Mode 2: FastAPI Server Usage (Recommended for Multi-Language/Service Architecture)
-
-Run as a FastAPI server and use HTTP API calls:
-
-```bash
-# Start the server
-python main.py
-```
-
-Then make HTTP requests to `localhost:8000/generate-batch`. See [API Usage](#api-usage) section below for details.
-
-**Advantages of FastAPI Server:**
-- ✅ Language-agnostic HTTP API
-- ✅ Can be deployed as a service
-- ✅ Multiple applications can share one instance
-- ✅ Automatic API documentation at `/docs`
-- ✅ Easy horizontal scaling
 
 ### 📦 Installation
 

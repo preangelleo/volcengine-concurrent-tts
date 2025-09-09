@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -8,12 +9,32 @@ from volcengine_client import VolcengineConcurrentTTS, TaskItem as ClientTaskIte
 # Load environment variables from .env file (if it exists)
 load_dotenv()
 
+# --- Global Concurrency Control ---
+# This is the KEY: ONE global semaphore shared across ALL requests
+# This ensures total API calls never exceed the account limit
+DEFAULT_GLOBAL_CONCURRENCY = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
+global_semaphore = None  # Will be created in startup event
+
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Volcano Engine Concurrent TTS",
     description="A high-performance application for concurrent text-to-speech generation using Volcano Engine, with intelligent batch processing and concurrency management.",
     version="1.0.0",
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize global semaphore in the correct event loop"""
+    global global_semaphore
+    global_semaphore = asyncio.Semaphore(DEFAULT_GLOBAL_CONCURRENCY)
+    print(f"🚀 Global concurrency semaphore initialized with limit: {DEFAULT_GLOBAL_CONCURRENCY}")
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    global global_semaphore
+    global_semaphore = None
+    print("🛑 Global concurrency semaphore cleaned up")
 
 # --- Pydantic Models for API Data Structure ---
 class TaskItem(BaseModel):
@@ -82,18 +103,23 @@ async def generate_batch(request: BatchRequest):
     if not request.tasks:
         return BatchResponse(results=[])
 
-    # Get concurrency setting with priority: request > .env > default
-    default_concurrency = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
-    concurrency = default_concurrency
-    if request.credentials and request.credentials.volcengine_tts_concurrency is not None:
-        concurrency = request.credentials.volcengine_tts_concurrency
+    # Ensure global semaphore is initialized
+    if global_semaphore is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Global concurrency semaphore not initialized. Server may still be starting up."
+        )
+
+    # NOTE: Concurrency is now controlled by the GLOBAL semaphore
+    # Individual request concurrency settings are ignored for global control
+    # This ensures total API calls across ALL requests never exceed account limit
     
-    # Create client instance
+    # Create client instance (concurrency parameter is not used when external_semaphore is provided)
     client = VolcengineConcurrentTTS(
         app_id=app_id,
         access_key=access_key, 
         secret_key=secret_key,
-        concurrency=concurrency
+        concurrency=10  # This is ignored when using external_semaphore
     )
     
     # Convert API TaskItems to Client TaskItems
@@ -107,8 +133,8 @@ async def generate_batch(request: BatchRequest):
         for task in request.tasks
     ]
     
-    # Process tasks using the client
-    client_results = await client.generate_batch_async(client_tasks)
+    # CRITICAL: Pass global_semaphore to ensure all requests share the same concurrency limit
+    client_results = await client.generate_batch_async(client_tasks, external_semaphore=global_semaphore)
     
     # Convert Client TaskResults to API TaskResults
     results = [
@@ -120,8 +146,15 @@ async def generate_batch(request: BatchRequest):
 
 @app.get("/")
 def read_root():
-    default_concurrency = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
-    return {"message": f"Volcano Engine Concurrent TTS is running. Default concurrency limit: {default_concurrency}. You can override credentials and concurrency in API requests."}
+    available_slots = global_semaphore._value if global_semaphore else "Not initialized"
+    return {
+        "message": f"Volcano Engine Concurrent TTS is running with GLOBAL concurrency control.",
+        "global_concurrency_limit": DEFAULT_GLOBAL_CONCURRENCY,
+        "current_available_slots": available_slots,
+        "architecture": "All requests share a single global semaphore to prevent exceeding account limits",
+        "note": "Individual request concurrency settings are ignored in server mode for global control",
+        "semaphore_status": "initialized" if global_semaphore else "not_initialized"
+    }
 
 if __name__ == "__main__":
     import uvicorn

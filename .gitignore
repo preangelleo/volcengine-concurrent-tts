@@ -19,6 +19,7 @@ PRIVATE/
 
 # Test files and outputs
 test_output/
+output/
 test_*.py
 *_test.py
 *.mp3

@@ -102,12 +102,15 @@ class VolcengineConcurrentTTS:
                 # Return empty result on error
                 return TaskResult(task_id=task.task_id, audio_base64="")
     
-    async def generate_batch_async(self, tasks: List[TaskItem]) -> List[TaskResult]:
+    async def generate_batch_async(self, tasks: List[TaskItem], external_semaphore: Optional[asyncio.Semaphore] = None) -> List[TaskResult]:
         """
         Asynchronously generate TTS for a batch of tasks
         
         Args:
             tasks: List of TaskItem objects to process
+            external_semaphore: Optional external semaphore for global concurrency control.
+                               If provided, this will be used instead of creating a new one.
+                               This is CRITICAL for FastAPI server mode to ensure global concurrency limits.
             
         Returns:
             List of TaskResult objects with generated audio
@@ -115,8 +118,9 @@ class VolcengineConcurrentTTS:
         if not tasks:
             return []
         
-        # Create semaphore for concurrency control
-        semaphore = asyncio.Semaphore(self.concurrency)
+        # Use external semaphore if provided (for global control), 
+        # otherwise create local semaphore (for direct client usage)
+        semaphore = external_semaphore if external_semaphore is not None else asyncio.Semaphore(self.concurrency)
         
         # Create a single aiohttp session for all tasks
         async with aiohttp.ClientSession() as session:
