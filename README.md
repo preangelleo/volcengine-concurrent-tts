@@ -31,12 +31,14 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 
 ## Features
 
-- **Batch Processing**: Submit multiple TTS tasks in a single API call.
-- **Concurrency Control**: Manages a queue to not exceed the API concurrency limit set in your Volcano Engine account.
-- **Easy to Deploy**: Run as a standard FastAPI application.
-- **Flexible Credentials**: Supports credentials via API payload or environment variables with priority system.
-- **No Environment Required**: Can run without any .env file - just provide credentials in API requests.
-- **Official Voice Support**: Supports all official Volcano Engine TTS voices.
+- **Dual Usage Modes**: Use as a Python client library OR as a FastAPI server
+- **Batch Processing**: Submit multiple TTS tasks in a single operation
+- **Concurrency Control**: Intelligent queue management to respect API limits
+- **Flexible Credentials**: API payload or environment variables with priority system
+- **No Environment Required**: Can run without any .env file
+- **Official Voice Support**: Supports all official Volcano Engine TTS voices
+- **PyPI Package**: Install with pip for easy integration
+- **Sync & Async Support**: Both synchronous and asynchronous APIs available
 
 ## Quick Start
 
@@ -93,7 +95,93 @@ python test_volc_tts_logic.py
 
 For detailed testing instructions, see `PRIVATE/TEST_GUIDE.md`
 
-## API Usage
+## Usage Modes
+
+This application supports **two usage modes** to fit different integration needs:
+
+### 🔥 Mode 1: Direct Client Usage (Recommended for Python Projects)
+
+Use the `VolcengineConcurrentTTS` client class directly in your Python applications:
+
+```python
+from volcengine_client import VolcengineConcurrentTTS, TaskItem
+
+# Initialize client
+client = VolcengineConcurrentTTS(
+    app_id="your_app_id",
+    access_key="your_access_key", 
+    secret_key="your_secret_key",
+    concurrency=10
+)
+
+# Create tasks
+tasks = [
+    TaskItem("task1", "Hello world", "BV001_streaming"),
+    TaskItem("task2", "How are you?", "BV002_streaming")
+]
+
+# Async usage (recommended)
+results = await client.generate_batch_async(tasks)
+
+# Sync usage (also available)
+results = client.generate_batch_sync(tasks)
+
+# Single text generation
+result = await client.generate_single_async("Hello!", "BV001_streaming")
+
+# Save audio to file
+client.save_audio_file(result, "output.mp3")
+```
+
+**Advantages of Direct Client Usage:**
+- ✅ No server setup required
+- ✅ Lower latency (no HTTP overhead)  
+- ✅ Direct Python integration
+- ✅ Both sync and async support
+- ✅ Easier error handling
+
+### 🌐 Mode 2: FastAPI Server Usage (Recommended for Multi-Language/Service Architecture)
+
+Run as a FastAPI server and use HTTP API calls:
+
+```bash
+# Start the server
+python main.py
+```
+
+Then make HTTP requests to `localhost:8000/generate-batch`. See [API Usage](#api-usage) section below for details.
+
+**Advantages of FastAPI Server:**
+- ✅ Language-agnostic HTTP API
+- ✅ Can be deployed as a service
+- ✅ Multiple applications can share one instance
+- ✅ Automatic API documentation at `/docs`
+- ✅ Easy horizontal scaling
+
+### 📦 Installation
+
+**Option 1: Install from PyPI (when published):**
+```bash
+pip install volcengine-concurrent-tts
+```
+
+**Option 2: Install from source:**
+```bash
+git clone <repository-url>
+cd volcengine-concurrent-tts
+pip install -e .
+
+# Install with server dependencies
+pip install -e .[server]
+```
+
+**Option 3: Use without installation:**
+Just download the files and import directly:
+```python
+from volcengine_client import VolcengineConcurrentTTS
+```
+
+## API Usage (Mode 2: FastAPI Server)
 
 Send a `POST` request to the `/generate-batch` endpoint.
 
@@ -191,4 +279,127 @@ The API will return a list of results, each containing the `task_id` and the bas
     }
   ]
 }
+```
+
+## Client API Reference (Mode 1)
+
+### VolcengineConcurrentTTS Class
+
+#### Constructor
+```python
+client = VolcengineConcurrentTTS(app_id, access_key, secret_key, concurrency=10)
+```
+
+**Parameters:**
+- `app_id` (str): Your Volcano Engine App ID
+- `access_key` (str): Your Volcano Engine Access Key  
+- `secret_key` (str): Your Volcano Engine Secret Key
+- `concurrency` (int, optional): Maximum concurrent requests (default: 10)
+
+#### Methods
+
+##### Batch Generation
+
+```python
+# Asynchronous batch generation (recommended)
+results = await client.generate_batch_async(tasks: List[TaskItem]) -> List[TaskResult]
+
+# Synchronous batch generation
+results = client.generate_batch_sync(tasks: List[TaskItem]) -> List[TaskResult]
+```
+
+##### Single Generation
+
+```python
+# Asynchronous single generation
+result = await client.generate_single_async(
+    text: str, 
+    voice_type: str = "BV001_streaming", 
+    task_id: Optional[str] = None
+) -> TaskResult
+
+# Synchronous single generation  
+result = client.generate_single_sync(
+    text: str,
+    voice_type: str = "BV001_streaming",
+    task_id: Optional[str] = None
+) -> TaskResult
+```
+
+##### Utility Methods
+
+```python
+# Get raw audio bytes from result
+audio_bytes = client.get_audio_bytes(result: TaskResult) -> bytes
+
+# Save audio to file
+success = client.save_audio_file(result: TaskResult, filename: str) -> bool
+```
+
+### Data Classes
+
+#### TaskItem
+```python
+task = TaskItem(
+    task_id="unique_id",
+    text="Text to synthesize", 
+    voice_type="BV001_streaming",
+    output_filename="optional_filename"  # Optional
+)
+```
+
+#### TaskResult
+```python
+# TaskResult attributes:
+result.task_id          # str: Task identifier
+result.audio_base64     # str: Base64 encoded audio data
+result.to_dict()        # dict: Convert to dictionary
+```
+
+### Factory Function
+
+```python
+# Alternative way to create client
+from volcengine_client import create_client
+
+client = create_client(app_id, access_key, secret_key, concurrency=10)
+```
+
+## Testing Both Modes
+
+Run the comprehensive test script to see both usage modes in action:
+
+```bash
+python test_client_usage.py
+```
+
+This script demonstrates:
+- Direct client usage with various methods
+- FastAPI server usage with HTTP requests  
+- Performance comparison between modes
+- Installation and setup instructions
+
+## Error Handling
+
+### Direct Client Mode
+```python
+try:
+    results = await client.generate_batch_async(tasks)
+    for result in results:
+        if result.audio_base64:
+            print(f"✅ {result.task_id}: Success")
+        else:
+            print(f"❌ {result.task_id}: Failed (empty audio)")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"Generation error: {e}")
+```
+
+### FastAPI Server Mode
+HTTP status codes indicate success/failure:
+- `200`: Success with audio data
+- `400`: Missing or invalid credentials
+- `422`: Invalid request format
+- `500`: Internal server error
 ```

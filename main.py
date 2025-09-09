@@ -1,18 +1,12 @@
-import asyncio
 import os
-import base64
-import aiohttp # Added for aiohttp.ClientSession
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from volc_tts import generate_audio_async
+from volcengine_client import VolcengineConcurrentTTS, TaskItem as ClientTaskItem, TaskResult as ClientTaskResult
 
 # Load environment variables from .env file (if it exists)
 load_dotenv()
-
-# --- Default Configuration ---
-DEFAULT_CONCURRENCY = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
@@ -20,10 +14,6 @@ app = FastAPI(
     description="A high-performance application for concurrent text-to-speech generation using Volcano Engine, with intelligent batch processing and concurrency management.",
     version="1.0.0",
 )
-
-# --- Semaphore for Concurrency Control ---
-# This semaphore will be initialized dynamically based on request or default
-semaphore = asyncio.Semaphore(DEFAULT_CONCURRENCY)
 
 # --- Pydantic Models for API Data Structure ---
 class TaskItem(BaseModel):
@@ -66,25 +56,6 @@ def get_credentials(request_credentials: Optional[VolcanoEngineCredentials]) -> 
     
     return app_id, access_key, secret_key
 
-async def process_one_task(session: aiohttp.ClientSession, task: TaskItem, app_id: str, access_key: str, secret_key: str, task_semaphore: asyncio.Semaphore) -> TaskResult:
-    """
-    Processes a single TTS task, respecting the concurrency semaphore.
-    """
-    async with task_semaphore:
-        try:
-            audio_bytes = await generate_audio_async(
-                session=session,
-                app_id=app_id,
-                access_key=access_key,
-                secret_key=secret_key,
-                text=task.text,
-                voice_type=task.voice_type
-            )
-            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-            return TaskResult(task_id=task.task_id, audio_base64=audio_base64)
-        except Exception as e:
-            return TaskResult(task_id=task.task_id, audio_base64="")
-
 
 # --- API Endpoint ---
 @app.post("/generate-batch", response_model=BatchResponse)
@@ -112,32 +83,45 @@ async def generate_batch(request: BatchRequest):
         return BatchResponse(results=[])
 
     # Get concurrency setting with priority: request > .env > default
-    concurrency = DEFAULT_CONCURRENCY
+    default_concurrency = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
+    concurrency = default_concurrency
     if request.credentials and request.credentials.volcengine_tts_concurrency is not None:
         concurrency = request.credentials.volcengine_tts_concurrency
     
-    # Create a semaphore for this specific request
-    request_semaphore = asyncio.Semaphore(concurrency)
-
-    # Create a single aiohttp session for all tasks in this batch
-    async with aiohttp.ClientSession() as session:
-        # Create a list of asyncio tasks
-        asyncio_tasks = [
-            process_one_task(session, task_item, app_id, access_key, secret_key, request_semaphore) 
-            for task_item in request.tasks
-        ]
-
-        # Run all tasks concurrently and wait for them to complete
-        results = await asyncio.gather(*asyncio_tasks)
-
-    # Sort results by task_id before returning
-    results.sort(key=lambda x: x.task_id)
+    # Create client instance
+    client = VolcengineConcurrentTTS(
+        app_id=app_id,
+        access_key=access_key, 
+        secret_key=secret_key,
+        concurrency=concurrency
+    )
+    
+    # Convert API TaskItems to Client TaskItems
+    client_tasks = [
+        ClientTaskItem(
+            task_id=task.task_id,
+            text=task.text,
+            voice_type=task.voice_type,
+            output_filename=task.output_filename
+        )
+        for task in request.tasks
+    ]
+    
+    # Process tasks using the client
+    client_results = await client.generate_batch_async(client_tasks)
+    
+    # Convert Client TaskResults to API TaskResults
+    results = [
+        TaskResult(task_id=result.task_id, audio_base64=result.audio_base64)
+        for result in client_results
+    ]
 
     return BatchResponse(results=results)
 
 @app.get("/")
 def read_root():
-    return {"message": f"Volcano Engine Concurrent TTS is running. Default concurrency limit: {DEFAULT_CONCURRENCY}. You can override credentials and concurrency in API requests."}
+    default_concurrency = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
+    return {"message": f"Volcano Engine Concurrent TTS is running. Default concurrency limit: {default_concurrency}. You can override credentials and concurrency in API requests."}
 
 if __name__ == "__main__":
     import uvicorn
