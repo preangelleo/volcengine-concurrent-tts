@@ -1,13 +1,22 @@
 import os
 import asyncio
-from typing import List, Optional
-from fastapi import FastAPI, HTTPException
+from typing import List, Optional, Tuple
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from volcengine_client import VolcengineConcurrentTTS, TaskItem as ClientTaskItem, TaskResult as ClientTaskResult
 
 # Load environment variables from .env file (if it exists)
 load_dotenv()
+
+# --- Service Configuration ---
+# Admin API Key for trusted, internal requests
+ADMIN_API_KEY = os.getenv('ADMIN_API_KEY')
+
+# Server's own Volcano Engine credentials (optional)
+# Can be used by requests authenticated with the Admin API Key
+SERVER_VOLCENGINE_TTS_APPID = os.getenv('VOLCENGINE_TTS_APPID')
+SERVER_VOLCENGINE_TTS_ACCESS_KEY = os.getenv('VOLCENGINE_TTS_ACCESS_KEY')
 
 # --- Global Concurrency Control ---
 # This is the KEY: ONE global semaphore shared across ALL requests
@@ -27,7 +36,12 @@ async def startup_event():
     """Initialize global semaphore in the correct event loop"""
     global global_semaphore
     global_semaphore = asyncio.Semaphore(DEFAULT_GLOBAL_CONCURRENCY)
-    print(f"🚀 Global concurrency semaphore initialized with limit: {DEFAULT_GLOBAL_CONCURRENCY}")
+    print("✅ Volcano Engine Concurrent TTS started.")
+    print(f"🚦 Global concurrency limit set to: {DEFAULT_GLOBAL_CONCURRENCY}")
+    if ADMIN_API_KEY:
+        print("🔑 Admin API Key is configured.")
+    if SERVER_VOLCENGINE_TTS_APPID and SERVER_VOLCENGINE_TTS_ACCESS_KEY:
+        print("🔑 Server's own Volcano Engine credentials are configured.")
 
 @app.on_event("shutdown") 
 async def shutdown_event():
@@ -59,9 +73,53 @@ class TaskResult(BaseModel):
 class BatchResponse(BaseModel):
     results: List[TaskResult]
 
-# --- Helper Functions ---
+# --- Authentication Helper ---
+def get_credentials_from_request(request: Request, request_credentials: Optional[VolcanoEngineCredentials]) -> Tuple[str, str, Optional[str], Optional[int]]:
+    """
+    Determines the appropriate Volcano Engine credentials based on a 3-tier authentication logic.
+
+    Tier 1: Admin Key in Header -> Uses Server's Credentials
+    Tier 2: Credentials in Payload -> Uses User's Credentials  
+    Tier 3: Environment Variables -> Uses Server's Credentials
+    Tier 4: Failure
+
+    Returns:
+        A tuple of (app_id, access_key, error_message, status_code).
+        On success, app_id and access_key are strings and the other two are None.
+        On failure, app_id and access_key are None and the other two have values.
+    """
+    # Tier 1: Check for Admin API Key in headers
+    admin_key_from_header = request.headers.get('Admin-API-Key')
+    if ADMIN_API_KEY and admin_key_from_header == ADMIN_API_KEY:
+        if SERVER_VOLCENGINE_TTS_APPID and SERVER_VOLCENGINE_TTS_ACCESS_KEY:
+            # Admin is authenticated and server has credentials
+            return SERVER_VOLCENGINE_TTS_APPID, SERVER_VOLCENGINE_TTS_ACCESS_KEY, None, None
+        else:
+            # Admin is authenticated, but server is not configured with credentials
+            error_msg = "Admin authenticated, but the service is not configured with VOLCENGINE_TTS_APPID and VOLCENGINE_TTS_ACCESS_KEY."
+            return None, None, error_msg, 500  # Internal Server Error
+
+    # Tier 2: Check for user-provided credentials in the request payload
+    if request_credentials:
+        app_id = request_credentials.volcengine_tts_appid 
+        access_key = request_credentials.volcengine_tts_access_key
+        if app_id and access_key:
+            return app_id, access_key, None, None
+
+    # Tier 3: Fallback to environment variables (for backward compatibility)
+    app_id = os.getenv("VOLCENGINE_TTS_APPID")
+    access_key = os.getenv("VOLCENGINE_TTS_ACCESS_KEY")
+    if app_id and access_key:
+        return app_id, access_key, None, None
+
+    # Tier 4: Authentication failed
+    error_msg = "Authentication failed. Provide 'Admin-API-Key' in headers or complete credentials in payload."
+    return None, None, error_msg, 401  # Unauthorized
+
+# --- Legacy Helper Function (for backward compatibility) ---
 def get_credentials(request_credentials: Optional[VolcanoEngineCredentials]) -> tuple[str, str]:
     """
+    Legacy function for backward compatibility.
     Get credentials with priority: request payload > .env > None
     Returns (app_id, access_key)
     """
@@ -77,24 +135,16 @@ def get_credentials(request_credentials: Optional[VolcanoEngineCredentials]) -> 
 
 # --- API Endpoint ---
 @app.post("/generate-batch", response_model=BatchResponse)
-async def generate_batch(request: BatchRequest):
+async def generate_batch(request: BatchRequest, http_request: Request):
     """
     Accepts a batch of TTS tasks and processes them concurrently.
-    Credentials priority: request payload > environment variables > error
+    Authentication: Admin API Key in header OR credentials in payload OR environment variables
     """
-    # Get credentials with priority: request > .env
-    app_id, access_key = get_credentials(request.credentials)
+    # Get credentials using new authentication logic
+    app_id, access_key, error_msg, status_code = get_credentials_from_request(http_request, request.credentials)
     
-    # Validate credentials
-    if not all([app_id, access_key]):
-        missing = []
-        if not app_id: missing.append("volcengine_tts_appid")
-        if not access_key: missing.append("volcengine_tts_access_key") 
-        
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Missing required credentials: {', '.join(missing)}. Provide them in the request payload or set environment variables."
-        )
+    if error_msg:
+        raise HTTPException(status_code=status_code, detail=error_msg)
 
     if not request.tasks:
         return BatchResponse(results=[])
@@ -143,12 +193,21 @@ async def generate_batch(request: BatchRequest):
 def read_root():
     available_slots = global_semaphore._value if global_semaphore else "Not initialized"
     return {
+        "status": "ok",
+        "service": "volcengine-concurrent-tts",
         "message": f"Volcano Engine Concurrent TTS is running with GLOBAL concurrency control.",
         "global_concurrency_limit": DEFAULT_GLOBAL_CONCURRENCY,
         "current_available_slots": available_slots,
         "architecture": "All requests share a single global semaphore to prevent exceeding account limits",
         "note": "Individual request concurrency settings are ignored in server mode for global control",
-        "semaphore_status": "initialized" if global_semaphore else "not_initialized"
+        "semaphore_status": "initialized" if global_semaphore else "not_initialized",
+        "admin_key_configured": bool(ADMIN_API_KEY),
+        "server_credentials_configured": bool(SERVER_VOLCENGINE_TTS_APPID and SERVER_VOLCENGINE_TTS_ACCESS_KEY),
+        "authentication": {
+            "admin_api_key": "Admin-API-Key header authentication supported",
+            "user_credentials": "User-provided credentials in payload supported", 
+            "environment_variables": "Environment variable fallback supported"
+        }
     }
 
 if __name__ == "__main__":
