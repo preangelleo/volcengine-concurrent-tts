@@ -71,7 +71,19 @@ When developing with Volcano Engine's TTS API, developers face common challenges
    VOLCENGINE_TTS_CONCURRENCY=10
    ```
    
-   **Option B - No Configuration Required:**
+   **Option B - Admin API Key (Recommended for Production):**
+   For internal services and production deployments, configure an Admin API Key:
+   ```
+   # Add to your .env file
+   ADMIN_API_KEY=your_custom_admin_key_here
+   VOLCENGINE_TTS_APPID=your_app_id
+   VOLCENGINE_TTS_ACCESS_KEY=your_access_key
+   VOLCENGINE_TTS_CONCURRENCY=10
+   ```
+   
+   With Admin API Key configured, internal services can authenticate using the `Admin-API-Key` header without exposing individual API credentials in requests.
+   
+   **Option C - No Configuration Required:**
    Skip this step and provide credentials directly in API requests (see API Usage section).
 
 ### Running the Application
@@ -297,7 +309,26 @@ The application supports flexible credential management with the following prior
 }
 ```
 
-**Example 3 - Mixed Mode (Override specific credentials):**
+**Example 3 - Using Admin API Key (Recommended for Internal Services):**
+
+```bash
+curl -X POST http://localhost:8000/generate-batch \
+  -H "Content-Type: application/json" \
+  -H "Admin-API-Key: your_custom_admin_key_here" \
+  -d '{
+    "tasks": [
+      {
+        "task_id": "scene_01",
+        "text": "Hello, this is a test.",
+        "voice_type": "en_male_jason_conversation_wvae_bigtts"
+      }
+    ]
+  }'
+```
+
+When using the Admin API Key, the server uses its own pre-configured credentials (VOLCENGINE_TTS_APPID, VOLCENGINE_TTS_ACCESS_KEY) without exposing them in the request payload.
+
+**Example 4 - Mixed Mode (Override specific credentials):**
 
 ```json
 {
