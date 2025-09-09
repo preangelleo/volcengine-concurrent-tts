@@ -11,12 +11,12 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="volcengine-concurrent-tts",
     version="1.0.0",
-    author="Volcengine TTS Team",
-    author_email="dev@volcengine.com",
+    author="Animagent Development Team",
+    author_email="preangelleo@gmail.com",
     description="A high-performance client and server for concurrent text-to-speech generation using Volcano Engine's TTS API",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/volcengine/volcengine-concurrent-tts",
+    url="https://github.com/preangelleo/volcengine-concurrent-tts",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -54,8 +54,8 @@ setup(
     },
     keywords="volcengine, tts, text-to-speech, concurrent, batch, api, client, fastapi",
     project_urls={
-        "Bug Reports": "https://github.com/volcengine/volcengine-concurrent-tts/issues",
-        "Source": "https://github.com/volcengine/volcengine-concurrent-tts",
-        "Documentation": "https://github.com/volcengine/volcengine-concurrent-tts#readme",
+        "Bug Reports": "https://github.com/preangelleo/volcengine-concurrent-tts/issues",
+        "Source": "https://github.com/preangelleo/volcengine-concurrent-tts",
+        "Documentation": "https://github.com/preangelleo/volcengine-concurrent-tts#readme",
     },
 )

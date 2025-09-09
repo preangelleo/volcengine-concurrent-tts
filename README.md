@@ -68,7 +68,6 @@ When developing with Volcano Engine's TTS API, developers face common challenges
    ```
    VOLCENGINE_TTS_APPID=your_app_id
    VOLCENGINE_TTS_ACCESS_KEY=your_access_key
-   VOLCENGINE_TTS_SECRET_KEY=your_secret_key
    VOLCENGINE_TTS_CONCURRENCY=10
    ```
    
@@ -77,23 +76,29 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 
 ### Running the Application
 
-Start the FastAPI server:
+**Method 1 - Direct Python execution (Development):**
 ```bash
 conda activate animagent
 python main.py
+```
+
+**Method 2 - Using installed console script (After installation):**
+```bash
+conda activate animagent
+volcengine-tts-server
+```
+
+**Method 3 - Using uvicorn directly:**
+```bash
+conda activate animagent
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 The application will be available at `http://localhost:8000`
 
 ### Testing
 
-Run the test script to verify the application:
-```bash
-conda activate animagent
-python test_volc_tts_logic.py
-```
-
-For detailed testing instructions, see `PRIVATE/TEST_GUIDE.md`
+Create your own test files to verify the application functionality. Refer to the API usage examples below for testing both modes.
 
 ## Usage Modes
 
@@ -201,8 +206,7 @@ curl -X POST http://localhost:8000/generate-batch \
     "tasks": [{"task_id": "test", "text": "Hello world", "voice_type": "BV001_streaming"}],
     "credentials": {
       "volcengine_tts_appid": "your_app_id",
-      "volcengine_tts_access_key": "your_access_key",
-      "volcengine_tts_secret_key": "your_secret_key"
+      "volcengine_tts_access_key": "your_access_key"
     }
   }'
 ```
@@ -213,8 +217,7 @@ from volcengine_client import VolcengineConcurrentTTS, TaskItem
 
 client = VolcengineConcurrentTTS(
     app_id="your_app_id",
-    access_key="your_access_key", 
-    secret_key="your_secret_key",
+    access_key="your_access_key",
     concurrency=10  # This client's individual limit
 )
 
@@ -245,7 +248,7 @@ Just download the files and import directly:
 from volcengine_client import VolcengineConcurrentTTS
 ```
 
-## API Usage (Mode 2: FastAPI Server)
+## API Usage (Mode 1: FastAPI Server)
 
 Send a `POST` request to the `/generate-batch` endpoint.
 
@@ -289,7 +292,6 @@ The application supports flexible credential management with the following prior
   "credentials": {
     "volcengine_tts_appid": "your_app_id",
     "volcengine_tts_access_key": "your_access_key",
-    "volcengine_tts_secret_key": "your_secret_key",
     "volcengine_tts_concurrency": 15
   }
 }
@@ -323,7 +325,6 @@ The application supports flexible credential management with the following prior
 **credentials** (optional):
 - `volcengine_tts_appid`: Your Volcano Engine App ID
 - `volcengine_tts_access_key`: Your Volcano Engine Access Key
-- `volcengine_tts_secret_key`: Your Volcano Engine Secret Key
 - `volcengine_tts_concurrency`: Maximum concurrent requests (default: 10)
 
 **Success Response Example**:
@@ -345,19 +346,18 @@ The API will return a list of results, each containing the `task_id` and the bas
 }
 ```
 
-## Client API Reference (Mode 1)
+## Client API Reference (Mode 2: Direct Client)
 
 ### VolcengineConcurrentTTS Class
 
 #### Constructor
 ```python
-client = VolcengineConcurrentTTS(app_id, access_key, secret_key, concurrency=10)
+client = VolcengineConcurrentTTS(app_id, access_key, concurrency=10)
 ```
 
 **Parameters:**
 - `app_id` (str): Your Volcano Engine App ID
-- `access_key` (str): Your Volcano Engine Access Key  
-- `secret_key` (str): Your Volcano Engine Secret Key
+- `access_key` (str): Your Volcano Engine Access Key
 - `concurrency` (int, optional): Maximum concurrent requests (default: 10)
 
 #### Methods
@@ -426,22 +426,16 @@ result.to_dict()        # dict: Convert to dictionary
 # Alternative way to create client
 from volcengine_client import create_client
 
-client = create_client(app_id, access_key, secret_key, concurrency=10)
+client = create_client(app_id, access_key, concurrency=10)
 ```
 
 ## Testing Both Modes
 
-Run the comprehensive test script to see both usage modes in action:
-
-```bash
-python test_client_usage.py
-```
-
-This script demonstrates:
+Create your own test scripts to verify both usage modes. Your test scripts should demonstrate:
 - Direct client usage with various methods
 - FastAPI server usage with HTTP requests  
 - Performance comparison between modes
-- Installation and setup instructions
+- Integration with your specific use case
 
 ## Error Handling
 

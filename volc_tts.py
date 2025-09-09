@@ -4,14 +4,13 @@ import base64
 import uuid
 import aiohttp
 
-async def generate_audio_async(session: aiohttp.ClientSession, app_id: str, access_key: str, secret_key: str, text: str, voice_type: str = "BV001_streaming") -> bytes:
+async def generate_audio_async(session: aiohttp.ClientSession, app_id: str, access_key: str, text: str, voice_type: str = "BV001_streaming") -> bytes:
     """
     Asynchronously calls the Volcano Engine TTS API to generate audio via HTTP POST.
 
     :param session: An aiohttp.ClientSession instance.
     :param app_id: Your Volcano Engine App ID.
-    :param access_key: Your Volcano Engine Access Key (used as token for authentication).
-    :param secret_key: Your Volcano Engine Secret Key (not directly used in this HTTP call, but kept for consistency).
+    :param access_key: Your Volcano Engine Access Key (used as Bearer token for authentication).
     :param text: The text to be synthesized.
     :param voice_type: The desired official voice for synthesis.
     :return: The audio content in bytes.

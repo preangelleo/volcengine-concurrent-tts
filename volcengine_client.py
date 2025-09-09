@@ -38,8 +38,7 @@ class VolcengineConcurrentTTS:
         # Initialize client
         client = VolcengineConcurrentTTS(
             app_id="your_app_id",
-            access_key="your_access_key", 
-            secret_key="your_secret_key",
+            access_key="your_access_key",
             concurrency=10
         )
         
@@ -56,23 +55,21 @@ class VolcengineConcurrentTTS:
         results = client.generate_batch_sync(tasks)
     """
     
-    def __init__(self, app_id: str, access_key: str, secret_key: str, concurrency: int = 10):
+    def __init__(self, app_id: str, access_key: str, concurrency: int = 10):
         """
         Initialize the Volcengine TTS client
         
         Args:
             app_id: Volcano Engine App ID
             access_key: Volcano Engine Access Key
-            secret_key: Volcano Engine Secret Key
             concurrency: Maximum concurrent requests (default: 10)
         """
         self.app_id = app_id
         self.access_key = access_key
-        self.secret_key = secret_key
         self.concurrency = concurrency
         
-        if not all([app_id, access_key, secret_key]):
-            raise ValueError("app_id, access_key, and secret_key are required")
+        if not all([app_id, access_key]):
+            raise ValueError("app_id and access_key are required")
     
     async def _process_one_task(self, session: aiohttp.ClientSession, task: TaskItem, semaphore: asyncio.Semaphore) -> TaskResult:
         """
@@ -92,7 +89,6 @@ class VolcengineConcurrentTTS:
                     session=session,
                     app_id=self.app_id,
                     access_key=self.access_key,
-                    secret_key=self.secret_key,
                     text=task.text,
                     voice_type=task.voice_type
                 )
@@ -220,17 +216,16 @@ class VolcengineConcurrentTTS:
 
 
 # Factory function for easier client creation
-def create_client(app_id: str, access_key: str, secret_key: str, concurrency: int = 10) -> VolcengineConcurrentTTS:
+def create_client(app_id: str, access_key: str, concurrency: int = 10) -> VolcengineConcurrentTTS:
     """
     Factory function to create a VolcengineConcurrentTTS client
     
     Args:
         app_id: Volcano Engine App ID
         access_key: Volcano Engine Access Key
-        secret_key: Volcano Engine Secret Key
         concurrency: Maximum concurrent requests (default: 10)
         
     Returns:
         Initialized VolcengineConcurrentTTS client
     """
-    return VolcengineConcurrentTTS(app_id, access_key, secret_key, concurrency)
+    return VolcengineConcurrentTTS(app_id, access_key, concurrency)
