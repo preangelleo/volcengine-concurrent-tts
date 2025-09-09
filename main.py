@@ -8,14 +8,11 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from volc_tts import generate_audio_async
 
-# Load environment variables from .env file
+# Load environment variables from .env file (if it exists)
 load_dotenv()
 
-# --- Configuration ---
-APP_ID = os.getenv("VOLCENGINE_TTS_APPID")
-ACCESS_KEY = os.getenv("VOLCENGINE_TTS_ACCESS_KEY")
-SECRET_KEY = os.getenv("VOLCENGINE_TTS_SECRET_KEY")
-CONCURRENCY = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
+# --- Default Configuration ---
+DEFAULT_CONCURRENCY = int(os.getenv("VOLCENGINE_TTS_CONCURRENCY", "10"))
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
@@ -25,8 +22,8 @@ app = FastAPI(
 )
 
 # --- Semaphore for Concurrency Control ---
-# This semaphore limits the number of concurrent calls to the TTS API
-semaphore = asyncio.Semaphore(CONCURRENCY)
+# This semaphore will be initialized dynamically based on request or default
+semaphore = asyncio.Semaphore(DEFAULT_CONCURRENCY)
 
 # --- Pydantic Models for API Data Structure ---
 class TaskItem(BaseModel):
@@ -35,8 +32,15 @@ class TaskItem(BaseModel):
     voice_type: str = Field("BV001_streaming", description="The voice type to use for synthesis.")
     output_filename: Optional[str] = Field(None, description="Optional: Desired output filename (not used by the application, but can be useful for client-side tracking).")
 
+class VolcanoEngineCredentials(BaseModel):
+    volcengine_tts_appid: Optional[str] = Field(None, description="Volcano Engine App ID")
+    volcengine_tts_access_key: Optional[str] = Field(None, description="Volcano Engine Access Key")
+    volcengine_tts_secret_key: Optional[str] = Field(None, description="Volcano Engine Secret Key")
+    volcengine_tts_concurrency: Optional[int] = Field(None, description="Maximum concurrent requests (default: 10)")
+
 class BatchRequest(BaseModel):
     tasks: List[TaskItem]
+    credentials: Optional[VolcanoEngineCredentials] = Field(None, description="Optional Volcano Engine credentials (overrides environment variables)")
 
 class TaskResult(BaseModel):
     task_id: str
@@ -45,18 +49,34 @@ class TaskResult(BaseModel):
 class BatchResponse(BaseModel):
     results: List[TaskResult]
 
-# --- Helper Function for Processing a Single Task ---
-async def process_one_task(session: aiohttp.ClientSession, task: TaskItem) -> TaskResult:
+# --- Helper Functions ---
+def get_credentials(request_credentials: Optional[VolcanoEngineCredentials]) -> tuple[str, str, str]:
+    """
+    Get credentials with priority: request payload > .env > None
+    Returns (app_id, access_key, secret_key)
+    """
+    if request_credentials:
+        app_id = request_credentials.volcengine_tts_appid or os.getenv("VOLCENGINE_TTS_APPID")
+        access_key = request_credentials.volcengine_tts_access_key or os.getenv("VOLCENGINE_TTS_ACCESS_KEY")
+        secret_key = request_credentials.volcengine_tts_secret_key or os.getenv("VOLCENGINE_TTS_SECRET_KEY")
+    else:
+        app_id = os.getenv("VOLCENGINE_TTS_APPID")
+        access_key = os.getenv("VOLCENGINE_TTS_ACCESS_KEY")
+        secret_key = os.getenv("VOLCENGINE_TTS_SECRET_KEY")
+    
+    return app_id, access_key, secret_key
+
+async def process_one_task(session: aiohttp.ClientSession, task: TaskItem, app_id: str, access_key: str, secret_key: str, task_semaphore: asyncio.Semaphore) -> TaskResult:
     """
     Processes a single TTS task, respecting the concurrency semaphore.
     """
-    async with semaphore:
+    async with task_semaphore:
         try:
             audio_bytes = await generate_audio_async(
                 session=session,
-                app_id=APP_ID,
-                access_key=ACCESS_KEY,
-                secret_key=SECRET_KEY,
+                app_id=app_id,
+                access_key=access_key,
+                secret_key=secret_key,
                 text=task.text,
                 voice_type=task.voice_type
             )
@@ -71,17 +91,41 @@ async def process_one_task(session: aiohttp.ClientSession, task: TaskItem) -> Ta
 async def generate_batch(request: BatchRequest):
     """
     Accepts a batch of TTS tasks and processes them concurrently.
+    Credentials priority: request payload > environment variables > error
     """
-    if not all([APP_ID, ACCESS_KEY, SECRET_KEY]):
-        raise HTTPException(status_code=500, detail="Server is not configured. Missing Volcano Engine credentials.")
+    # Get credentials with priority: request > .env
+    app_id, access_key, secret_key = get_credentials(request.credentials)
+    
+    # Validate credentials
+    if not all([app_id, access_key, secret_key]):
+        missing = []
+        if not app_id: missing.append("volcengine_tts_appid")
+        if not access_key: missing.append("volcengine_tts_access_key") 
+        if not secret_key: missing.append("volcengine_tts_secret_key")
+        
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Missing required credentials: {', '.join(missing)}. Provide them in the request payload or set environment variables."
+        )
 
     if not request.tasks:
         return BatchResponse(results=[])
 
+    # Get concurrency setting with priority: request > .env > default
+    concurrency = DEFAULT_CONCURRENCY
+    if request.credentials and request.credentials.volcengine_tts_concurrency is not None:
+        concurrency = request.credentials.volcengine_tts_concurrency
+    
+    # Create a semaphore for this specific request
+    request_semaphore = asyncio.Semaphore(concurrency)
+
     # Create a single aiohttp session for all tasks in this batch
     async with aiohttp.ClientSession() as session:
         # Create a list of asyncio tasks
-        asyncio_tasks = [process_one_task(session, task_item) for task_item in request.tasks]
+        asyncio_tasks = [
+            process_one_task(session, task_item, app_id, access_key, secret_key, request_semaphore) 
+            for task_item in request.tasks
+        ]
 
         # Run all tasks concurrently and wait for them to complete
         results = await asyncio.gather(*asyncio_tasks)
@@ -93,7 +137,7 @@ async def generate_batch(request: BatchRequest):
 
 @app.get("/")
 def read_root():
-    return {"message": f"Volcano Engine Concurrent TTS is running. Concurrency limit is set to {CONCURRENCY}."}
+    return {"message": f"Volcano Engine Concurrent TTS is running. Default concurrency limit: {DEFAULT_CONCURRENCY}. You can override credentials and concurrency in API requests."}
 
 if __name__ == "__main__":
     import uvicorn

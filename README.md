@@ -34,7 +34,8 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 - **Batch Processing**: Submit multiple TTS tasks in a single API call.
 - **Concurrency Control**: Manages a queue to not exceed the API concurrency limit set in your Volcano Engine account.
 - **Easy to Deploy**: Run as a standard FastAPI application.
-- **Configurable**: All credentials and settings are managed through an environment file.
+- **Flexible Credentials**: Supports credentials via API payload or environment variables with priority system.
+- **No Environment Required**: Can run without any .env file - just provide credentials in API requests.
 - **Official Voice Support**: Supports all official Volcano Engine TTS voices.
 
 ## Quick Start
@@ -58,15 +59,19 @@ When developing with Volcano Engine's TTS API, developers face common challenges
    pip install -r requirements.txt
    ```
 
-3. **Configure environment variables:**
+3. **Configure credentials (Optional):**
+   
+   **Option A - Environment Variables (Optional):**
    Create a `.env` file in the project root with:
    ```
    VOLCENGINE_TTS_APPID=your_app_id
    VOLCENGINE_TTS_ACCESS_KEY=your_access_key
    VOLCENGINE_TTS_SECRET_KEY=your_secret_key
    VOLCENGINE_TTS_CONCURRENCY=10
-   FAV_VOICE_ID=your_preferred_voice_id
    ```
+   
+   **Option B - No Configuration Required:**
+   Skip this step and provide credentials directly in API requests (see API Usage section).
 
 ### Running the Application
 
@@ -94,7 +99,17 @@ Send a `POST` request to the `/generate-batch` endpoint.
 
 **Endpoint**: `POST /generate-batch`
 
-**Body Example**:
+### Credential Priority System
+
+The application supports flexible credential management with the following priority:
+
+1. **API Request Credentials** (Highest Priority) - Provided in request payload
+2. **Environment Variables** (Medium Priority) - From `.env` file
+3. **Error** (Lowest Priority) - Missing credentials will return error
+
+### Usage Examples
+
+**Example 1 - Using Environment Variables (.env file):**
 
 ```json
 {
@@ -102,26 +117,62 @@ Send a `POST` request to the `/generate-batch` endpoint.
     {
       "task_id": "scene_01",
       "text": "Hello, this is a test.",
-      "voice_type": "en_male_jason_conversation_wvae_bigtts" 
-    },
-    {
-      "task_id": "scene_02",
-      "text": "Welcome to Volcano Engine TTS.",
-      "voice_type": "BV001_streaming" 
+      "voice_type": "en_male_jason_conversation_wvae_bigtts"
     }
   ]
 }
 ```
 
-**Parameters:**
+**Example 2 - Using API Request Credentials (No .env required):**
+
+```json
+{
+  "tasks": [
+    {
+      "task_id": "scene_01",
+      "text": "Hello, this is a test.",
+      "voice_type": "en_male_jason_conversation_wvae_bigtts"
+    }
+  ],
+  "credentials": {
+    "volcengine_tts_appid": "your_app_id",
+    "volcengine_tts_access_key": "your_access_key",
+    "volcengine_tts_secret_key": "your_secret_key",
+    "volcengine_tts_concurrency": 15
+  }
+}
+```
+
+**Example 3 - Mixed Mode (Override specific credentials):**
+
+```json
+{
+  "tasks": [
+    {
+      "task_id": "scene_01", 
+      "text": "Hello, this is a test.",
+      "voice_type": "BV001_streaming"
+    }
+  ],
+  "credentials": {
+    "volcengine_tts_concurrency": 20
+  }
+}
+```
+
+### Request Parameters
+
+**tasks** (required):
 - `task_id`: Unique identifier for the task
-- `text`: The text to be converted to speech (supports multiple languages)
+- `text`: The text to be converted to speech (supports multiple languages)  
 - `voice_type`: The desired official voice ID. Examples:
   - Official voices: `BV001_streaming`, `en_male_jason_conversation_wvae_bigtts`, `zh_female_qingxin_conversation`, `BV002_streaming`
 
-**Configuration:**
-- `VOLCENGINE_TTS_CONCURRENCY`: Controls the maximum number of concurrent TTS API calls (default: 10)
-- `FAV_VOICE_ID`: Your preferred voice ID for testing and default usage
+**credentials** (optional):
+- `volcengine_tts_appid`: Your Volcano Engine App ID
+- `volcengine_tts_access_key`: Your Volcano Engine Access Key
+- `volcengine_tts_secret_key`: Your Volcano Engine Secret Key
+- `volcengine_tts_concurrency`: Maximum concurrent requests (default: 10)
 
 **Success Response Example**:
 
