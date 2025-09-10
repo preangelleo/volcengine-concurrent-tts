@@ -37,3 +37,6 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Deployment guides with sensitive information
+DEPLOYMENT_GUIDE.md
