@@ -45,19 +45,18 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 ### Prerequisites
 
 - Python 3.8+
-- Conda environment named `animagent`
 - Valid Volcano Engine TTS API credentials
 
 ### Installation
 
-1. **Navigate to the project directory:**
+1. **Clone and navigate to the project directory:**
    ```bash
+   git clone <repository-url>
    cd volcengine-concurrent-tts
    ```
 
-2. **Activate conda environment and install dependencies:**
+2. **Install dependencies:**
    ```bash
-   conda activate animagent
    pip install -r requirements.txt
    ```
 
@@ -90,19 +89,16 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 
 **Method 1 - Direct Python execution (Development):**
 ```bash
-conda activate animagent
 python main.py
 ```
 
 **Method 2 - Using installed console script (After installation):**
 ```bash
-conda activate animagent
 volcengine-tts-server
 ```
 
 **Method 3 - Using uvicorn directly:**
 ```bash
-conda activate animagent
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -116,38 +112,38 @@ Create your own test files to verify the application functionality. Refer to the
 
 This application supports **two usage modes** with **different concurrency control behaviors**:
 
-## 🚦 **Critical Concurrency Control Differences**
+## Critical Concurrency Control Differences
 
-### 🌐 **Mode 1: FastAPI Server (GLOBAL Concurrency Control)**
-**✅ Recommended for Multiple Applications/Users**
+### FastAPI Server Mode (Global Concurrency Control)
+**Recommended for Multiple Applications/Users**
 
 ```bash
 # Start the server - ALL requests share ONE global semaphore
 python main.py
 ```
 
-**🔒 Concurrency Behavior:**
+**Concurrency Behavior:**
 - **Global Limit**: ALL requests across ALL applications share the same concurrency pool
-- **Account Safe**: Total concurrent API calls NEVER exceed your Volcengine account limit
+- **Account Safe**: Total concurrent API calls NEVER exceed your Volcano Engine account limit
 - **Example**: 10 applications × 20 requests each = 200 total requests, but only 10 run concurrently
-- **Result**: ✅ No API limit violations, no 429 errors from Volcengine
+- **Result**: No API limit violations, no 429 errors from Volcano Engine
 
 ```python
 # Multiple applications can safely call the server simultaneously
 # App 1: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})
 # App 2: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})  
 # App 3: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})
-# → Server ensures max 10 concurrent Volcengine API calls total
+# → Server ensures max 10 concurrent Volcano Engine API calls total
 ```
 
 **Advantages:**
-- ✅ **Account Protection**: Never exceeds API limits regardless of load
-- ✅ Language-agnostic HTTP API
-- ✅ Multiple applications can share safely
-- ✅ Acts as a "gatekeeper" for your API quota
-- ✅ Centralized concurrency management
+- **Account Protection**: Never exceeds API limits regardless of load
+- Language-agnostic HTTP API
+- Multiple applications can share safely
+- Acts as a "gatekeeper" for your API quota
+- Centralized concurrency management
 
-**⚠️ Use This Mode When:**
+**Use This Mode When:**
 - You have multiple applications using TTS
 - You want to prevent API limit violations
 - You need centralized quota management
@@ -155,8 +151,8 @@ python main.py
 
 ---
 
-### 📦 **Mode 2: Direct Client (INDEPENDENT Concurrency Control)**
-**✅ Recommended for Single Application Usage**
+### Direct Client Mode (Independent Concurrency Control)
+**Recommended for Single Application Usage**
 
 ```python
 from volcengine_client import VolcengineConcurrentTTS, TaskItem
@@ -173,20 +169,20 @@ results = await client1.generate_batch_async(tasks)
 results = client2.generate_batch_sync(tasks)
 ```
 
-**🔒 Concurrency Behavior:**
+**Concurrency Behavior:**
 - **Independent Limits**: Each client instance has its own concurrency pool
 - **Risk of Overload**: Multiple clients can exceed total account limits
 - **Example**: 3 clients × 10 concurrent each = up to 30 concurrent API calls
-- **Result**: ⚠️ Potential 429 errors if total exceeds your Volcengine account limit
+- **Result**: Potential 429 errors if total exceeds your Volcano Engine account limit
 
 **Advantages:**
-- ✅ No server setup required
-- ✅ Lower latency (no HTTP overhead)
-- ✅ Direct Python integration  
-- ✅ Both sync and async support
-- ✅ Simpler for single-application use
+- No server setup required
+- Lower latency (no HTTP overhead)
+- Direct Python integration  
+- Both sync and async support
+- Simpler for single-application use
 
-**⚠️ Use This Mode When:**
+**Use This Mode When:**
 - You have only ONE application using TTS
 - You control all TTS usage in your system
 - You want maximum performance for a single use case
@@ -194,19 +190,19 @@ results = client2.generate_batch_sync(tasks)
 
 ---
 
-## 🎯 **Which Mode Should You Choose?**
+## Which Mode Should You Choose?
 
 | Scenario | Recommended Mode | Reason |
 |----------|------------------|---------|
-| **Multiple apps/users** | 🌐 **FastAPI Server** | Global concurrency control prevents API limit violations |
-| **Team development** | 🌐 **FastAPI Server** | Centralized quota management, no conflicts |
-| **Production deployment** | 🌐 **FastAPI Server** | Account protection, better resource management |
-| **Single Python app** | 📦 **Direct Client** | Simpler integration, lower latency |
-| **Prototyping/testing** | 📦 **Direct Client** | Faster setup, direct control |
+| **Multiple apps/users** | **FastAPI Server** | Global concurrency control prevents API limit violations |
+| **Team development** | **FastAPI Server** | Centralized quota management, no conflicts |
+| **Production deployment** | **FastAPI Server** | Account protection, better resource management |
+| **Single Python app** | **Direct Client** | Simpler integration, lower latency |
+| **Prototyping/testing** | **Direct Client** | Faster setup, direct control |
 
-## ⚡ **Quick Start Examples**
+## Quick Start Examples
 
-### 🌐 FastAPI Server Mode
+### FastAPI Server Mode
 ```bash
 # Terminal 1: Start server
 python main.py
@@ -223,7 +219,7 @@ curl -X POST http://localhost:8000/generate-batch \
   }'
 ```
 
-### 📦 Direct Client Mode
+### Direct Client Mode
 ```python
 from volcengine_client import VolcengineConcurrentTTS, TaskItem
 
@@ -237,7 +233,7 @@ tasks = [TaskItem("task1", "Hello world", "BV001_streaming")]
 results = await client.generate_batch_async(tasks)
 ```
 
-### 📦 Installation
+## Installation Options
 
 **Option 1: Install from PyPI (when published):**
 ```bash
