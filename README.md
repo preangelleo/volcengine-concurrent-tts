@@ -1,6 +1,26 @@
-# Volcano Engine Concurrent TTS
+# Volcano Engine Concurrent TTS v2.0
 
-A high-performance, self-hosted FastAPI application for concurrent text-to-speech generation using Volcano Engine's TTS API, featuring intelligent batch processing and concurrency management.
+A next-generation, high-performance FastAPI application for concurrent text-to-speech generation using Volcano Engine's TTS API, featuring **External Semaphore Pattern**, **Perfect Input/Output Correspondence**, and **Advanced Cross-Service Coordination**.
+
+## 🚀 What's New in v2.0
+
+### ✨ **External Semaphore Pattern**
+- **Cross-service concurrency control** - Share concurrency limits across multiple services
+- **Global semaphore registry** - Centralized management of external semaphores
+- **Admin-only semaphore creation** - Secure semaphore lifecycle management
+- **Zero-conflict coordination** - Multiple services can share the same concurrency pool
+
+### 🎯 **Perfect Input/Output Correspondence**
+- **Task index mapping** - Maintains exact order correspondence between input and output
+- **Enhanced TaskItem structure** - Support for `prompt` (renamed from `text`) and `output_filename`
+- **Structured results** - Each result includes task_index, original prompt, and generated files
+- **Batch processing integrity** - No more lost or mismatched results in concurrent processing
+
+### 🏗️ **Advanced Architecture Design**
+- **List of Dictionaries format** - Consistent with Replicate's advanced design patterns
+- **3-tier authentication** - Admin API Key → User Credentials → Environment Variables
+- **Enhanced health monitoring** - Comprehensive service status reporting
+- **Backward compatibility** - Legacy endpoints still supported
 
 ## Purpose and Use Cases
 
@@ -9,28 +29,41 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 - **Concurrency Limits**: Most Volcano Engine TTS accounts have a maximum concurrency limit (typically ~10 concurrent requests)
 - **Character-based Billing**: TTS services are billed per character, making efficient usage crucial
 - **Multiple Projects**: When multiple applications under the same API account need TTS generation, managing concurrency becomes complex
+- **Cross-Service Coordination**: Need to share concurrency limits across different microservices
 - **API Rate Limiting**: Exceeding concurrency limits results in API errors and failed requests
 
-**This application solves these problems by:**
+**This v2.0 application solves these problems by:**
 
 🎯 **Maximizing Concurrency Utilization**: Efficiently uses your full concurrency quota without exceeding limits
 
 🚦 **Built-in Queue Management**: Automatically queues requests when concurrency limit is reached, preventing API errors
 
-🏢 **Multi-Project Support**: All your applications can use this single endpoint, sharing the concurrency pool intelligently
+🏢 **Multi-Service Support**: All your microservices can share the same concurrency pool through External Semaphore Pattern
 
 ⚡ **High Efficiency**: Processes multiple TTS tasks concurrently while respecting API limitations
 
 📊 **Cost Optimization**: Maximizes your API quota utilization for better cost-effectiveness
 
+🔗 **Cross-Service Coordination**: Share concurrency limits across multiple services and applications
+
 **Perfect for scenarios where:**
-- You have multiple applications requiring TTS generation
-- You want to maximize your Volcano Engine API concurrency quota
+- You have multiple microservices requiring TTS generation
+- You want to maximize your Volcano Engine API concurrency quota across services
 - You need reliable TTS processing without API limit errors
-- You want centralized TTS processing for better resource management
+- You want centralized concurrency management for better resource coordination
+- You need perfect input/output correspondence in batch processing
 
 ## Features
 
+### v2.0 Enhanced Features
+- **🔗 External Semaphore Pattern**: Cross-service concurrency sharing
+- **📊 Perfect Input/Output Correspondence**: Exact task index mapping
+- **🏗️ Advanced Architecture**: List of dictionaries format matching Replicate design
+- **🔐 Enhanced Authentication**: 3-tier security system
+- **📈 Comprehensive Monitoring**: Detailed service health and status reporting
+- **🔄 Backward Compatibility**: Legacy API endpoints still supported
+
+### Core Features
 - **Dual Usage Modes**: Use as a Python client library OR as a FastAPI server
 - **Batch Processing**: Submit multiple TTS tasks in a single operation
 - **Concurrency Control**: Intelligent queue management to respect API limits
@@ -64,7 +97,7 @@ When developing with Volcano Engine's TTS API, developers face common challenges
    
    **Option A - Environment Variables (Optional):**
    Create a `.env` file in the project root with:
-   ```
+   ```env
    VOLCENGINE_TTS_APPID=your_app_id
    VOLCENGINE_TTS_ACCESS_KEY=your_access_key
    VOLCENGINE_TTS_CONCURRENCY=10
@@ -72,7 +105,7 @@ When developing with Volcano Engine's TTS API, developers face common challenges
    
    **Option B - Admin API Key (Recommended for Production):**
    For internal services and production deployments, configure an Admin API Key:
-   ```
+   ```env
    # Add to your .env file
    ADMIN_API_KEY=your_custom_admin_key_here
    VOLCENGINE_TTS_APPID=your_app_id
@@ -89,442 +122,447 @@ When developing with Volcano Engine's TTS API, developers face common challenges
 
 **Method 1 - Direct Python execution (Development):**
 ```bash
-python main.py
+python main_v2_upgraded.py
 ```
 
-**Method 2 - Using installed console script (After installation):**
+**Method 2 - Using uvicorn directly:**
 ```bash
-volcengine-tts-server
-```
-
-**Method 3 - Using uvicorn directly:**
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main_v2_upgraded:app --host 0.0.0.0 --port 8000
 ```
 
 The application will be available at `http://localhost:8000`
 
-### Testing
+### Testing v2.0 Features
 
-Create your own test files to verify the application functionality. Refer to the API usage examples below for testing both modes.
-
-## Usage Modes
-
-This application supports **two usage modes** with **different concurrency control behaviors**:
-
-## Critical Concurrency Control Differences
-
-### FastAPI Server Mode (Global Concurrency Control)
-**Recommended for Multiple Applications/Users**
-
+**Health Check (Enhanced v2.0):**
 ```bash
-# Start the server - ALL requests share ONE global semaphore
-python main.py
+curl http://localhost:8000/
 ```
 
-**Concurrency Behavior:**
-- **Global Limit**: ALL requests across ALL applications share the same concurrency pool
-- **Account Safe**: Total concurrent API calls NEVER exceed your Volcano Engine account limit
-- **Example**: 10 applications × 20 requests each = 200 total requests, but only 10 run concurrently
-- **Result**: No API limit violations, no 429 errors from Volcano Engine
-
-```python
-# Multiple applications can safely call the server simultaneously
-# App 1: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})
-# App 2: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})  
-# App 3: requests.post("http://server:8000/generate-batch", json={"tasks": [...]})
-# → Server ensures max 10 concurrent Volcano Engine API calls total
-```
-
-**Advantages:**
-- **Account Protection**: Never exceeds API limits regardless of load
-- Language-agnostic HTTP API
-- Multiple applications can share safely
-- Acts as a "gatekeeper" for your API quota
-- Centralized concurrency management
-
-**Use This Mode When:**
-- You have multiple applications using TTS
-- You want to prevent API limit violations
-- You need centralized quota management
-- You have team members using the same API account
-
----
-
-### Direct Client Mode (Independent Concurrency Control)
-**Recommended for Single Application Usage**
-
-```python
-from volcengine_client import VolcengineConcurrentTTS, TaskItem
-
-# Each client instance manages its OWN concurrency independently
-client1 = VolcengineConcurrentTTS(..., concurrency=10)  # Client 1: up to 10 concurrent
-client2 = VolcengineConcurrentTTS(..., concurrency=10)  # Client 2: up to 10 concurrent  
-client3 = VolcengineConcurrentTTS(..., concurrency=10)  # Client 3: up to 10 concurrent
-
-# Async usage
-results = await client1.generate_batch_async(tasks)
-
-# Sync usage  
-results = client2.generate_batch_sync(tasks)
-```
-
-**Concurrency Behavior:**
-- **Independent Limits**: Each client instance has its own concurrency pool
-- **Risk of Overload**: Multiple clients can exceed total account limits
-- **Example**: 3 clients × 10 concurrent each = up to 30 concurrent API calls
-- **Result**: Potential 429 errors if total exceeds your Volcano Engine account limit
-
-**Advantages:**
-- No server setup required
-- Lower latency (no HTTP overhead)
-- Direct Python integration  
-- Both sync and async support
-- Simpler for single-application use
-
-**Use This Mode When:**
-- You have only ONE application using TTS
-- You control all TTS usage in your system
-- You want maximum performance for a single use case
-- You can ensure total concurrency stays within limits
-
----
-
-## Which Mode Should You Choose?
-
-| Scenario | Recommended Mode | Reason |
-|----------|------------------|---------|
-| **Multiple apps/users** | **FastAPI Server** | Global concurrency control prevents API limit violations |
-| **Team development** | **FastAPI Server** | Centralized quota management, no conflicts |
-| **Production deployment** | **FastAPI Server** | Account protection, better resource management |
-| **Single Python app** | **Direct Client** | Simpler integration, lower latency |
-| **Prototyping/testing** | **Direct Client** | Faster setup, direct control |
-
-## Quick Start Examples
-
-### FastAPI Server Mode
-```bash
-# Terminal 1: Start server
-python main.py
-
-# Terminal 2: Use from any language
-curl -X POST http://localhost:8000/generate-batch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tasks": [{"task_id": "test", "text": "Hello world", "voice_type": "BV001_streaming"}],
-    "credentials": {
-      "volcengine_tts_appid": "your_app_id",
-      "volcengine_tts_access_key": "your_access_key"
-    }
-  }'
-```
-
-### Direct Client Mode
-```python
-from volcengine_client import VolcengineConcurrentTTS, TaskItem
-
-client = VolcengineConcurrentTTS(
-    app_id="your_app_id",
-    access_key="your_access_key",
-    concurrency=10  # This client's individual limit
-)
-
-tasks = [TaskItem("task1", "Hello world", "BV001_streaming")]
-results = await client.generate_batch_async(tasks)
-```
-
-## Installation Options
-
-**Option 1: Install from PyPI (when published):**
-```bash
-pip install volcengine-concurrent-tts
-```
-
-**Option 2: Install from source:**
-```bash
-git clone <repository-url>
-cd volcengine-concurrent-tts
-pip install -e .
-
-# Install with server dependencies
-pip install -e .[server]
-```
-
-**Option 3: Use without installation:**
-Just download the files and import directly:
-```python
-from volcengine_client import VolcengineConcurrentTTS
-```
-
-## API Usage (Mode 1: FastAPI Server)
-
-Send a `POST` request to the `/generate-batch` endpoint.
-
-**Endpoint**: `POST /generate-batch`
-
-### Credential Priority System
-
-The application supports flexible credential management with the following priority:
-
-1. **API Request Credentials** (Highest Priority) - Provided in request payload
-2. **Environment Variables** (Medium Priority) - From `.env` file
-3. **Error** (Lowest Priority) - Missing credentials will return error
-
-### Usage Examples
-
-**Example 1 - Using Environment Variables (.env file):**
-
+**Expected Response:**
 ```json
 {
-  "tasks": [
-    {
-      "task_id": "scene_01",
-      "text": "Hello, this is a test.",
-      "voice_type": "en_male_jason_conversation_wvae_bigtts"
-    }
-  ]
-}
-```
-
-**Example 2 - Using API Request Credentials (No .env required):**
-
-```json
-{
-  "tasks": [
-    {
-      "task_id": "scene_01",
-      "text": "Hello, this is a test.",
-      "voice_type": "en_male_jason_conversation_wvae_bigtts"
-    }
-  ],
-  "credentials": {
-    "volcengine_tts_appid": "your_app_id",
-    "volcengine_tts_access_key": "your_access_key",
-    "volcengine_tts_concurrency": 15
+  "status": "healthy",
+  "service": "volcengine-concurrent-tts",
+  "version": "2.0.0-external-semaphore-enhanced",
+  "message": "Enhanced Volcano Engine Concurrent TTS with External Semaphore Pattern",
+  "architecture": {
+    "external_semaphore_pattern": "✅ Enabled",
+    "perfect_input_output_correspondence": "✅ Enabled",
+    "advanced_batch_processing": "✅ Enabled",
+    "cross_service_coordination": "✅ Enabled"
+  },
+  "concurrency_status": {
+    "global_concurrency_limit": 10,
+    "current_available_slots": 10,
+    "external_semaphores_count": 0
   }
 }
 ```
 
-**Example 3 - Using Admin API Key (Recommended for Internal Services):**
+## v2.0 API Usage
 
-```bash
-curl -X POST http://localhost:8000/generate-batch \
-  -H "Content-Type: application/json" \
-  -H "Admin-API-Key: your_custom_admin_key_here" \
-  -d '{
-    "tasks": [
-      {
-        "task_id": "scene_01",
-        "text": "Hello, this is a test.",
-        "voice_type": "en_male_jason_conversation_wvae_bigtts"
-      }
-    ]
-  }'
-```
+### Enhanced Batch Generation API
 
-When using the Admin API Key, the server uses its own pre-configured credentials (VOLCENGINE_TTS_APPID, VOLCENGINE_TTS_ACCESS_KEY) without exposing them in the request payload.
+**Endpoint**: `POST /generate-batch`
 
-**Example 4 - Mixed Mode (Override specific credentials):**
+**v2.0 Enhanced Request Format (List of Dictionaries):**
 
 ```json
 {
   "tasks": [
     {
-      "task_id": "scene_01", 
-      "text": "Hello, this is a test.",
+      "prompt": "Hello, this is a test message.",
+      "output_filename": "test_audio_001.mp3",
+      "voice_type": "en_male_jason_conversation_wvae_bigtts"
+    },
+    {
+      "prompt": "This is another test message.",
+      "output_filename": "test_audio_002.mp3",
       "voice_type": "BV001_streaming"
     }
   ],
   "credentials": {
-    "volcengine_tts_concurrency": 20
+    "volcengine_tts_appid": "your_app_id",
+    "volcengine_tts_access_key": "your_access_key"
   }
 }
 ```
 
-### Request Parameters
-
-**tasks** (required):
-- `task_id`: Unique identifier for the task
-- `text`: The text to be converted to speech (supports multiple languages)  
-- `voice_type`: The desired official voice ID. Examples:
-  - Official voices: `BV001_streaming`, `en_male_jason_conversation_wvae_bigtts`, `zh_female_qingxin_conversation`, `BV002_streaming`
-
-**credentials** (optional):
-- `volcengine_tts_appid`: Your Volcano Engine App ID
-- `volcengine_tts_access_key`: Your Volcano Engine Access Key
-- `volcengine_tts_concurrency`: Maximum concurrent requests (default: 10)
-
-**Success Response Example**:
-
-The API will return a list of results, each containing the `task_id` and the base64-encoded audio data.
+**v2.0 Enhanced Response Format (Perfect Correspondence):**
 
 ```json
 {
   "results": [
     {
-      "task_id": "scene_01",
-      "audio_base64": "..."
+      "task_index": 0,
+      "prompt": "Hello, this is a test message.",
+      "output_filename": "test_audio_001.mp3",
+      "generated_files": [
+        {
+          "filename": "test_audio_001.mp3",
+          "url": "data:audio/mp3;base64,UklGRnoGAABXQVZFZm10IBAAAA...",
+          "format": "mp3"
+        }
+      ],
+      "success": true
     },
     {
-      "task_id": "scene_02",
-      "audio_base64": "..."
+      "task_index": 1,
+      "prompt": "This is another test message.",
+      "output_filename": "test_audio_002.mp3",
+      "generated_files": [
+        {
+          "filename": "test_audio_002.mp3",
+          "url": "data:audio/mp3;base64,UklGRnoGAABXQVZFZm10IBAAAA...",
+          "format": "mp3"
+        }
+      ],
+      "success": true
     }
   ]
 }
 ```
 
-## Client API Reference (Mode 2: Direct Client)
+### External Semaphore Pattern (v2.0 Feature)
 
-### VolcengineConcurrentTTS Class
-
-#### Constructor
-```python
-client = VolcengineConcurrentTTS(app_id, access_key, concurrency=10)
+**Create External Semaphore** (Admin only):
+```bash
+curl -X POST http://localhost:8000/external-semaphores \
+  -H "Admin-API-Key: your_admin_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "semaphore_id": "shared-tts-pool",
+    "max_concurrent": 10,
+    "description": "Shared TTS semaphore across services"
+  }'
 ```
 
-**Parameters:**
-- `app_id` (str): Your Volcano Engine App ID
-- `access_key` (str): Your Volcano Engine Access Key
-- `concurrency` (int, optional): Maximum concurrent requests (default: 10)
-
-#### Methods
-
-##### Batch Generation
-
-```python
-# Asynchronous batch generation (recommended)
-results = await client.generate_batch_async(tasks: List[TaskItem]) -> List[TaskResult]
-
-# Synchronous batch generation
-results = client.generate_batch_sync(tasks: List[TaskItem]) -> List[TaskResult]
+**Use External Semaphore in Batch Generation:**
+```json
+{
+  "tasks": [
+    {
+      "prompt": "Test with external semaphore",
+      "output_filename": "test.mp3"
+    }
+  ],
+  "external_semaphore_id": "shared-tts-pool",
+  "credentials": {
+    "volcengine_tts_appid": "your_app_id",
+    "volcengine_tts_access_key": "your_access_key"
+  }
+}
 ```
 
-##### Single Generation
+### Authentication Methods (3-Tier System)
 
-```python
-# Asynchronous single generation
-result = await client.generate_single_async(
-    text: str, 
-    voice_type: str = "BV001_streaming", 
-    task_id: Optional[str] = None
-) -> TaskResult
-
-# Synchronous single generation  
-result = client.generate_single_sync(
-    text: str,
-    voice_type: str = "BV001_streaming",
-    task_id: Optional[str] = None
-) -> TaskResult
+**Tier 1 - Admin API Key (Highest Priority):**
+```bash
+curl -X POST http://localhost:8000/generate-batch \
+  -H "Admin-API-Key: your_admin_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tasks": [
+      {
+        "prompt": "Admin authenticated request",
+        "output_filename": "admin_test.mp3"
+      }
+    ]
+  }'
 ```
 
-##### Utility Methods
-
-```python
-# Get raw audio bytes from result
-audio_bytes = client.get_audio_bytes(result: TaskResult) -> bytes
-
-# Save audio to file
-success = client.save_audio_file(result: TaskResult, filename: str) -> bool
+**Tier 2 - User Credentials in Payload:**
+```json
+{
+  "tasks": [...],
+  "credentials": {
+    "volcengine_tts_appid": "user_app_id",
+    "volcengine_tts_access_key": "user_access_key"
+  }
+}
 ```
 
-### Data Classes
-
-#### TaskItem
-```python
-task = TaskItem(
-    task_id="unique_id",
-    text="Text to synthesize", 
-    voice_type="BV001_streaming",
-    output_filename="optional_filename"  # Optional
-)
+**Tier 3 - Environment Variables:**
+```bash
+# With .env file configured
+curl -X POST http://localhost:8000/generate-batch \
+  -H "Content-Type: application/json" \
+  -d '{"tasks": [...]}'
 ```
 
-#### TaskResult
-```python
-# TaskResult attributes:
-result.task_id          # str: Task identifier
-result.audio_base64     # str: Base64 encoded audio data
-result.to_dict()        # dict: Convert to dictionary
+## Legacy API Support (Backward Compatibility)
+
+**Legacy Format Still Supported:**
+```json
+{
+  "tasks": [
+    {
+      "task_id": "test_1",
+      "text": "Hello world",
+      "voice_type": "BV001_streaming"
+    }
+  ]
+}
 ```
 
-### Factory Function
-
-```python
-# Alternative way to create client
-from volcengine_client import create_client
-
-client = create_client(app_id, access_key, concurrency=10)
+**Legacy Response Format:**
+```json
+{
+  "results": [
+    {
+      "task_id": "test_1",
+      "audio_base64": "UklGRnoGAABXQVZFZm10IBAAAA..."
+    }
+  ]
+}
 ```
 
-## Docker Deployment
+## Docker Deployment v2.0
 
 ### Docker Hub Repository
-🐳 **Official Docker Image**: [`betashow/volcengine-concurrent-tts`](https://hub.docker.com/repository/docker/betashow/volcengine-concurrent-tts/general)
+🐳 **Official Docker Image**: [`betashow/volcengine-concurrent-tts:latest`](https://hub.docker.com/repository/docker/betashow/volcengine-concurrent-tts/general)
 
 ### Quick Docker Usage
 ```bash
-# Pull the latest image
+# Pull the latest v2.0 image
 docker pull betashow/volcengine-concurrent-tts:latest
 
 # Run with environment variables
 docker run -d \
-  --name volcengine-tts \
+  --name volcengine-tts-v2 \
   -p 8000:8000 \
   -e VOLCENGINE_TTS_APPID=your_app_id \
   -e VOLCENGINE_TTS_ACCESS_KEY=your_access_key \
   -e VOLCENGINE_TTS_CONCURRENCY=10 \
+  -e ADMIN_API_KEY=your_admin_key \
   betashow/volcengine-concurrent-tts:latest
 
-# Run without environment variables (credentials via API payload)
-docker run -d \
-  --name volcengine-tts \
-  -p 8000:8000 \
-  betashow/volcengine-concurrent-tts:latest
+# Verify v2.0 deployment
+curl http://localhost:8000/
 ```
 
-### Production Deployment
-The service can be deployed behind a reverse proxy (nginx) with custom endpoints:
-- **Health Check**: `GET /` - Returns service status
-- **API Endpoint**: `POST /generate-batch` - Main TTS generation endpoint
-- **Recommended Setup**: Deploy behind nginx with rate limiting and SSL termination
+### Production Deployment (v2.0 Enhanced)
 
-### Docker Features
-- ✅ **No pre-loaded credentials** - Secure deployment
-- ✅ **User-provided credentials** via API payload
-- ✅ **Health checks** built-in for container orchestration
-- ✅ **Production ready** with proper error handling
-- ✅ **Global concurrency control** for API rate limiting
+**Environment Configuration:**
+```env
+# Core TTS Configuration
+VOLCENGINE_TTS_APPID=your_app_id
+VOLCENGINE_TTS_ACCESS_KEY=your_access_key
+VOLCENGINE_TTS_CONCURRENCY=10
 
-## Testing Both Modes
+# v2.0 Enhanced Features
+ADMIN_API_KEY=your_secure_admin_key
 
-Create your own test scripts to verify both usage modes. Your test scripts should demonstrate:
-- Direct client usage with various methods
-- FastAPI server usage with HTTP requests  
-- Performance comparison between modes
-- Integration with your specific use case
-- Docker container testing with production endpoints
+# Production Settings
+FLASK_HOST=0.0.0.0
+FLASK_PORT=8000
+FLASK_DEBUG=false
+```
+
+**Production Features:**
+- ✅ **External Semaphore Support** - Cross-service coordination
+- ✅ **Perfect Input/Output Correspondence** - Enhanced batch processing
+- ✅ **3-Tier Authentication** - Secure credential management
+- ✅ **Health Monitoring** - Comprehensive service status
+- ✅ **Backward Compatibility** - Legacy API support
+- ✅ **Container Health Checks** - Built-in for orchestration
+
+## Architecture Comparison
+
+### v1.0 vs v2.0 Architecture
+
+| Feature | v1.0 | v2.0 Enhanced |
+|---------|------|---------------|
+| **Concurrency Control** | Local semaphore only | ✅ Local + External Semaphore Pattern |
+| **Input/Output Mapping** | Basic task_id mapping | ✅ Perfect correspondence with task_index |
+| **Data Format** | Simple key-value | ✅ List of dictionaries (Replicate-style) |
+| **Cross-Service Support** | No | ✅ External semaphore sharing |
+| **Authentication** | 2-tier (payload/env) | ✅ 3-tier (admin/payload/env) |
+| **Monitoring** | Basic health check | ✅ Comprehensive status reporting |
+| **Backward Compatibility** | N/A | ✅ Full legacy API support |
+
+### External Semaphore Pattern Benefits
+
+1. **Cross-Service Coordination**: Multiple microservices can share the same concurrency pool
+2. **Global Resource Management**: Centralized control over API usage across services
+3. **Zero-Conflict Processing**: Services coordinate automatically without manual intervention
+4. **Scalable Architecture**: Add/remove services without reconfiguring concurrency limits
+5. **Admin-Controlled**: Secure semaphore lifecycle management with admin authentication
+
+## Performance & Monitoring
+
+### v2.0 Enhanced Monitoring
+
+**Service Status Endpoint:**
+```bash
+curl http://localhost:8000/
+```
+
+**Comprehensive Response:**
+```json
+{
+  "status": "healthy",
+  "version": "2.0.0-external-semaphore-enhanced",
+  "architecture": {
+    "external_semaphore_pattern": "✅ Enabled",
+    "perfect_input_output_correspondence": "✅ Enabled",
+    "advanced_batch_processing": "✅ Enabled"
+  },
+  "concurrency_status": {
+    "global_concurrency_limit": 10,
+    "current_available_slots": 8,
+    "external_semaphores_count": 2
+  },
+  "authentication": {
+    "admin_api_key": "✅ Configured",
+    "user_credentials": "✅ Supported",
+    "environment_variables": "✅ Fallback"
+  }
+}
+```
+
+### Performance Optimization
+
+- **Perfect Correspondence**: Eliminates result sorting overhead
+- **External Semaphore**: Reduces coordination latency between services
+- **Advanced Batching**: Optimized for high-throughput scenarios
+- **Efficient Memory Usage**: Streaming audio processing with cleanup
+
+## Migration Guide (v1.0 → v2.0)
+
+### API Changes
+1. **New Enhanced Format**: Use `prompt` instead of `text`, add `output_filename`
+2. **Legacy Support**: Old format still works (backward compatibility)
+3. **Enhanced Response**: New response includes `task_index` and `generated_files`
+
+### Code Migration Example
+
+**v1.0 Format (Still Supported):**
+```json
+{
+  "tasks": [
+    {"task_id": "1", "text": "Hello", "voice_type": "BV001_streaming"}
+  ]
+}
+```
+
+**v2.0 Enhanced Format (Recommended):**
+```json
+{
+  "tasks": [
+    {"prompt": "Hello", "output_filename": "hello.mp3", "voice_type": "BV001_streaming"}
+  ]
+}
+```
+
+### Docker Migration
+```bash
+# Pull v2.0 image
+docker pull betashow/volcengine-concurrent-tts:latest
+
+# Stop v1.0 container
+docker stop volcengine-tts
+
+# Start v2.0 container
+docker run -d --name volcengine-tts-v2 \
+  -p 8000:8000 \
+  --env-file .env \
+  betashow/volcengine-concurrent-tts:latest
+```
 
 ## Error Handling
 
-### Direct Client Mode
-```python
-try:
-    results = await client.generate_batch_async(tasks)
-    for result in results:
-        if result.audio_base64:
-            print(f"✅ {result.task_id}: Success")
-        else:
-            print(f"❌ {result.task_id}: Failed (empty audio)")
-except ValueError as e:
-    print(f"Configuration error: {e}")
-except Exception as e:
-    print(f"Generation error: {e}")
+### Enhanced v2.0 Error Responses
+
+**Authentication Error:**
+```json
+{
+  "detail": "Authentication failed. Provide 'Admin-API-Key' in headers or complete credentials in payload.",
+  "error_code": "AUTH_FAILED",
+  "suggested_action": "Check your Admin-API-Key header or credentials in payload"
+}
 ```
 
-### FastAPI Server Mode
-HTTP status codes indicate success/failure:
+**External Semaphore Error:**
+```json
+{
+  "detail": "External semaphore 'shared-pool' not found or access denied.",
+  "error_code": "SEMAPHORE_NOT_FOUND",
+  "available_semaphores": ["default-pool", "premium-pool"]
+}
+```
+
+### HTTP Status Codes
 - `200`: Success with audio data
 - `400`: Missing or invalid credentials
+- `401`: Authentication failed
+- `403`: Access denied (admin required)
+- `404`: External semaphore not found
 - `422`: Invalid request format
 - `500`: Internal server error
+
+## Testing
+
+### v2.0 Feature Testing
+
+**Test External Semaphore Pattern:**
+```bash
+# Create external semaphore (admin required)
+curl -X POST http://localhost:8000/external-semaphores \
+  -H "Admin-API-Key: your_admin_key" \
+  -d '{"semaphore_id": "test-pool", "max_concurrent": 5}'
+
+# Use external semaphore
+curl -X POST http://localhost:8000/generate-batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tasks": [{"prompt": "Test", "output_filename": "test.mp3"}],
+    "external_semaphore_id": "test-pool",
+    "credentials": {"volcengine_tts_appid": "...", "volcengine_tts_access_key": "..."}
+  }'
 ```
+
+**Test Perfect Correspondence:**
+```bash
+# Submit multiple tasks and verify task_index mapping
+curl -X POST http://localhost:8000/generate-batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tasks": [
+      {"prompt": "First", "output_filename": "first.mp3"},
+      {"prompt": "Second", "output_filename": "second.mp3"},
+      {"prompt": "Third", "output_filename": "third.mp3"}
+    ],
+    "credentials": {"volcengine_tts_appid": "...", "volcengine_tts_access_key": "..."}
+  }'
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/v2-enhancement`)
+3. Commit your changes (`git commit -am 'Add v2.0 feature'`)
+4. Push to the branch (`git push origin feature/v2-enhancement`)
+5. Create a Pull Request
+
+## License
+
+[Your License Here]
+
+## Changelog
+
+### v2.0.0 (2025-09-10)
+- ✅ **Added**: External Semaphore Pattern for cross-service coordination
+- ✅ **Added**: Perfect Input/Output Correspondence with task_index mapping
+- ✅ **Added**: Advanced architecture matching Replicate design patterns
+- ✅ **Added**: 3-tier authentication system (Admin → User → Environment)
+- ✅ **Enhanced**: Health monitoring with comprehensive status reporting
+- ✅ **Enhanced**: Docker deployment with v2.0 features
+- ✅ **Maintained**: Full backward compatibility with v1.0 API
+
+### v1.0.0
+- Initial release with basic concurrent TTS processing
+- Local semaphore-based concurrency control
+- FastAPI server and direct client modes
+- Docker support

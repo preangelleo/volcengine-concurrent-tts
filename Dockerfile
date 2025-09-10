@@ -15,9 +15,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source code
-COPY main.py .
-COPY volc_tts.py .
+COPY main_v2_upgraded.py .
 COPY volcengine_client.py .
+COPY volc_tts.py .
 COPY setup.py .
 
 # Create .env.example for reference (no actual credentials)
@@ -35,4 +35,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/', timeout=5)"
 
 # Run the FastAPI application
-CMD ["python", "main.py"]
+CMD ["python", "main_v2_upgraded.py"]
